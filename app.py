@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv 
+import asyncio
 import jellyfish
+from dotenv import load_dotenv 
 load_dotenv() 
 
 # GET API TOKENS
@@ -45,10 +46,42 @@ async def sync(interaction: discord.Interaction):
     await bot.tree.sync()
     await interaction.response.send_message("commands synced")
 
+
 @bot.tree.command(name="zawarldo",description="You're next words are:")
-async def lockIn(interaction: discord.Interaction, phrase: str, user:str):
-    #guild = discord.Interaction.
-    await interaction.response.send_message(phrase,ephemeral=True)
+async def lockIn(interaction: discord.Interaction, phrase: str, user:discord.Member):
+    await interaction.response.send_message(f"Prediction locked in! Waiting for {user.mention}'s next 3 messages...", ephemeral=True)
+
+    for i in range(3):
+        try:
+            message = await bot.wait_for(
+                "message", 
+                check=lambda message: message.channel == interaction.channel and message.author == user, 
+                timeout=60
+            )
+            similarity_value = jellyfish.jaro_similarity(phrase, message.content)
+            if similarity_value > 0.8:
+                embed = discord.Embed(colour=0x00b0f4)
+                embed.description = f"You've been Zawarldo'd! {interaction.user.mention} predicted your next message in 4K"
+                embed.add_field(name=f"{interaction.user.display_name}'s Message:",
+                                value= phrase,
+                                inline=False)
+                embed.add_field(name=f"{user.display_name}'s Message:",
+                                value=message.content,
+                                inline=False)
+                embed.set_image(url="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjhrMG9vOGUweGk5MXpjY3YzcWV3cTNjem45Z3E0dnlmcWc2Nmd5OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uISzZpAzbQ4nK/giphy.gif")
+                await interaction.channel.send(embed=embed)
+                return          
+        except asyncio.TimeoutError:
+            return
+
+    embed = discord.Embed(colour=0x00b0f4)
+    embed.description = f"{interaction.user.display_name} tried to predict your message and was wrong. -Aura"
+    embed.add_field(name=f"{interaction.user.display_name} thought you would say:",
+                value= phrase,
+                inline=False)
+    embed.set_image(url="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDA3MmZtcWsybHJ3eGt3YW9lcjNlM3Z0Ynk1dnkyb2VjbDhwNWpjNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/pNn4hlkovWAHfpLRRD/giphy.gif")
+
+    await interaction.channel.send(embed=embed)
 
 @bot.event
 async def on_message(message):
